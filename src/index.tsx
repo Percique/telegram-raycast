@@ -48,6 +48,23 @@ interface DialogEntity {
   about?: string;
 }
 
+// Добавляем интерфейсы для типизации
+interface TelegramPhoto {
+  _: string;
+  id: string;
+  sizes: Array<{
+    _: string;
+    type: string;
+    bytes: Uint8Array;
+  }>;
+}
+
+interface TelegramPhotosResponse {
+  _: string;
+  photos: TelegramPhoto[];
+  users: any[];
+}
+
 // Resolves opening chats in Telegram
 async function openInTelegram(chatId: string, username: string | undefined) {
   if (username) {
@@ -330,40 +347,37 @@ export default function Command() {
           try {
             if (entity && 'photo' in entity && entity.photo) {
               try {
-                // Пробуем загрузить фото через API Telegram
-                const photos = await telegramClient.invoke({
-                  _: 'photos.getUserPhotos',
-                  user_id: entity.id,
-                  offset: 0,
-                  max_id: 0,
-                  limit: 1
-                });
+                // Используем getProfilePhotos из API клиента
+                const photos = await telegramClient.getProfilePhotos(
+                  {
+                    id: BigInt(entity.id?.toString() || "0"),
+                    accessHash: BigInt((entity as any).access_hash || "0"),
+                    type: entity.className?.toLowerCase() || "user"
+                  },
+                  {
+                    limit: 1
+                  }
+                );
 
-                if (photos && photos.photos && photos.photos.length > 0) {
-                  const photo = photos.photos[0];
-                  const file = await telegramClient.invoke({
-                    _: 'upload.getFile',
-                    location: {
-                      _: 'inputPeerPhotoFileLocation',
-                      peer: {
-                        _: 'inputPeerUser',
-                        user_id: entity.id,
-                        access_hash: entity.access_hash
-                      },
-                      photo_id: photo.id
+                if (photos && photos.length > 0) {
+                  const buffer = await telegramClient.downloadProfilePhoto(
+                    {
+                      id: BigInt(entity.id?.toString() || "0"),
+                      accessHash: BigInt((entity as any).access_hash || "0"),
+                      type: entity.className?.toLowerCase() || "user"
                     },
-                    offset: 0,
-                    limit: 1024 * 1024 // 1MB
-                  });
+                    {
+                      isBig: false
+                    }
+                  );
 
-                  if (file && file.bytes) {
-                    const blob = new Blob([file.bytes], { type: 'image/jpeg' });
+                  if (buffer) {
+                    const blob = new Blob([buffer], { type: 'image/jpeg' });
                     photoUrl = URL.createObjectURL(blob);
                   }
                 }
               } catch (downloadError) {
                 console.warn("Error downloading photo:", downloadError);
-                // Если не удалось загрузить фото, используем дефолтные иконки
                 photoUrl = chatType === "Private" ? Icon.PersonCircle :
                           chatType === "Channel" ? Icon.Globe :
                           Icon.Person;
