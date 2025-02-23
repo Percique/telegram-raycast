@@ -10,6 +10,7 @@ import {
   Detail,
   open,
   getPreferenceValues,
+  Image,
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 import { TelegramClient } from "telegram";
@@ -288,6 +289,15 @@ export default function Command() {
       console.log("Loading chats...");
       setIsLoading(true);
       
+      // Проверяем авторизацию перед загрузкой чатов
+      const isAuthorized = await telegramClient.isUserAuthorized().catch(() => false);
+      if (!isAuthorized) {
+        console.log("Not authorized, clearing session...");
+        await clearSession();
+        await initTelegram();
+        return;
+      }
+
       const dialogs = await telegramClient.getDialogs({
         limit: 100
       });
@@ -316,6 +326,56 @@ export default function Command() {
             return text.replace(/[\x00-\x1F\x7F-\x9F]/gu, "");
           };
 
+          let photoUrl: string | undefined;
+          try {
+            if (entity && 'photo' in entity && entity.photo) {
+              try {
+                // Пробуем загрузить фото через API Telegram
+                const photos = await telegramClient.invoke({
+                  _: 'photos.getUserPhotos',
+                  user_id: entity.id,
+                  offset: 0,
+                  max_id: 0,
+                  limit: 1
+                });
+
+                if (photos && photos.photos && photos.photos.length > 0) {
+                  const photo = photos.photos[0];
+                  const file = await telegramClient.invoke({
+                    _: 'upload.getFile',
+                    location: {
+                      _: 'inputPeerPhotoFileLocation',
+                      peer: {
+                        _: 'inputPeerUser',
+                        user_id: entity.id,
+                        access_hash: entity.access_hash
+                      },
+                      photo_id: photo.id
+                    },
+                    offset: 0,
+                    limit: 1024 * 1024 // 1MB
+                  });
+
+                  if (file && file.bytes) {
+                    const blob = new Blob([file.bytes], { type: 'image/jpeg' });
+                    photoUrl = URL.createObjectURL(blob);
+                  }
+                }
+              } catch (downloadError) {
+                console.warn("Error downloading photo:", downloadError);
+                // Если не удалось загрузить фото, используем дефолтные иконки
+                photoUrl = chatType === "Private" ? Icon.PersonCircle :
+                          chatType === "Channel" ? Icon.Globe :
+                          Icon.Person;
+              }
+            }
+          } catch (photoError) {
+            console.warn("Error with photo:", photoError);
+            photoUrl = chatType === "Private" ? Icon.PersonCircle :
+                      chatType === "Channel" ? Icon.Globe :
+                      Icon.Person;
+          }
+
           return {
             id: peerId,
             username: entity?.username || "",
@@ -324,6 +384,7 @@ export default function Command() {
             unreadCount: dialog.unreadCount || 0,
             lastMessage: sanitizeText(dialog.message?.message)?.substring(0, 100) || "",
             description: sanitizeText(entity?.about) || "",
+            photoUrl
           };
         })
       );
@@ -338,17 +399,18 @@ export default function Command() {
   }
 
   async function clearSession() {
-    try {
-      if (client) {
+    console.log("Clearing session...");
+    if (client) {
+      try {
         await client.disconnect();
+      } catch (error) {
+        console.warn("Error disconnecting client:", error);
       }
-      await LocalStorage.removeItem(SESSION_KEY);
-      setNeedAuth(true);
-      setChats([]);
-      await initTelegram();
-    } catch (error) {
-      await handleError(error);
     }
+    await LocalStorage.removeItem(SESSION_KEY);
+    setClient(null);
+    setNeedAuth(true);
+    setChats([]); // Очищаем список чатов
   }
 
   async function handleError(error: unknown) {
@@ -382,6 +444,17 @@ export default function Command() {
       console.error("Error generating QR code:", err);
     }
   }
+
+  useEffect(() => {
+    return () => {
+      // Очищаем URL объекты при размонтировании
+      chats.forEach(chat => {
+        if (chat.photoUrl) {
+          URL.revokeObjectURL(chat.photoUrl);
+        }
+      });
+    };
+  }, [chats]);
 
   if (selectedChat) {
     return (
@@ -463,9 +536,9 @@ ${qrCode}
         {filteredChats.map((chat) => (
           <ErrorBoundary key={chat.id}>
             <List.Item
+              key={chat.id}
               title={chat.title}
               subtitle={chat.lastMessage}
-              icon={Icon.Message}
               accessories={[
                 {
                   text: chat.unreadCount ? String(chat.unreadCount) : undefined,
@@ -475,6 +548,21 @@ ${qrCode}
                 },
                 { text: chat.type }
               ]}
+              icon={
+                chat.photoUrl ? 
+                  {
+                    source: chat.photoUrl,
+                    mask: Image.Mask.Circle,
+                    fallback: chat.type === "Private" ? Icon.PersonCircle :
+                             chat.type === "Channel" ? Icon.Globe :
+                             Icon.Person
+                  } :
+                  { 
+                    source: chat.type === "Private" ? Icon.PersonCircle :
+                            chat.type === "Channel" ? Icon.Globe :
+                            Icon.Person
+                  }
+              }
               actions={
                 <ActionPanel>
                   <Action
