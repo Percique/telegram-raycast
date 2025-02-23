@@ -347,41 +347,33 @@ export default function Command() {
           try {
             if (entity && 'photo' in entity && entity.photo) {
               try {
-                // Используем getProfilePhotos из API клиента
-                const photos = await telegramClient.getProfilePhotos(
-                  {
-                    id: BigInt(entity.id?.toString() || "0"),
-                    accessHash: BigInt((entity as any).access_hash || "0"),
-                    type: entity.className?.toLowerCase() || "user"
-                  },
-                  {
-                    limit: 1
-                  }
-                );
+                // Используем прямые ссылки на аватарки
+                if (entity.username) {
+                  // Для публичных чатов/каналов/пользователей
+                  photoUrl = `https://t.me/${entity.username}/photo`;
+                } else if (entity.id) {
+                  // Для приватных чатов используем ID
+                  const peerType = entity.className?.toLowerCase() || 'user';
+                  photoUrl = `tg://peer?id=${entity.id}&type=${peerType}`;
+                }
 
-                if (photos && photos.length > 0) {
-                  const buffer = await telegramClient.downloadProfilePhoto(
-                    {
-                      id: BigInt(entity.id?.toString() || "0"),
-                      accessHash: BigInt((entity as any).access_hash || "0"),
-                      type: entity.className?.toLowerCase() || "user"
-                    },
-                    {
-                      isBig: false
-                    }
-                  );
-
-                  if (buffer) {
-                    const blob = new Blob([buffer], { type: 'image/jpeg' });
-                    photoUrl = URL.createObjectURL(blob);
-                  }
+                // Если не удалось получить URL, используем дефолтные иконки
+                if (!photoUrl) {
+                  photoUrl = chatType === "Private" ? Icon.PersonCircle :
+                            chatType === "Channel" ? Icon.Globe :
+                            Icon.Person;
                 }
               } catch (downloadError) {
-                console.warn("Error downloading photo:", downloadError);
+                console.warn("Error with photo URL:", downloadError);
                 photoUrl = chatType === "Private" ? Icon.PersonCircle :
                           chatType === "Channel" ? Icon.Globe :
                           Icon.Person;
               }
+            } else {
+              // Если нет фото, используем дефолтные иконки
+              photoUrl = chatType === "Private" ? Icon.PersonCircle :
+                        chatType === "Channel" ? Icon.Globe :
+                        Icon.Person;
             }
           } catch (photoError) {
             console.warn("Error with photo:", photoError);
@@ -564,13 +556,16 @@ ${qrCode}
               ]}
               icon={
                 chat.photoUrl ? 
-                  {
-                    source: chat.photoUrl,
-                    mask: Image.Mask.Circle,
-                    fallback: chat.type === "Private" ? Icon.PersonCircle :
-                             chat.type === "Channel" ? Icon.Globe :
-                             Icon.Person
-                  } :
+                  (chat.photoUrl.startsWith('http') || chat.photoUrl.startsWith('tg://') ? 
+                    {
+                      source: chat.photoUrl,
+                      mask: Image.Mask.Circle,
+                      fallback: chat.type === "Private" ? Icon.PersonCircle :
+                               chat.type === "Channel" ? Icon.Globe :
+                               Icon.Person
+                    } :
+                    { source: chat.photoUrl }
+                  ) : 
                   { 
                     source: chat.type === "Private" ? Icon.PersonCircle :
                             chat.type === "Channel" ? Icon.Globe :
