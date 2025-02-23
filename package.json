@@ -3,7 +3,7 @@
   "title": "Telegram for Raycast",
   "description": "Search through Telegram chats, channels, and messages",
   "icon": "command-icon.png",
-  "author": "percique",
+  "author": "robert_vaganyan",
   "owner": "percique",
   "private": true,
   "categories": [
