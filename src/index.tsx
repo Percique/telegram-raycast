@@ -91,10 +91,30 @@ function ChatMessages({ chat, onClose, client, handleError }: ChatMessagesProps)
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [chatPhoto, setChatPhoto] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     loadMessages();
+    loadChatPhoto();
   }, []);
+
+  async function loadChatPhoto() {
+    try {
+      if (!client) return;
+
+      const entity = await client.getEntity(chat.id);
+      if (entity && 'photo' in entity && entity.photo) {
+        const buffer = await client.downloadProfilePhoto(entity);
+        if (buffer) {
+          const blob = new Blob([buffer], { type: 'image/jpeg' });
+          const photoUrl = URL.createObjectURL(blob);
+          setChatPhoto(photoUrl);
+        }
+      }
+    } catch (error) {
+      console.warn("Error loading chat photo:", error);
+    }
+  }
 
   async function loadMessages() {
     try {
@@ -123,6 +143,14 @@ function ChatMessages({ chat, onClose, client, handleError }: ChatMessagesProps)
     }
   }
 
+  useEffect(() => {
+    return () => {
+      if (chatPhoto) {
+        URL.revokeObjectURL(chatPhoto);
+      }
+    };
+  }, [chatPhoto]);
+
   return (
     <List
       isLoading={isLoading}
@@ -135,10 +163,22 @@ function ChatMessages({ chat, onClose, client, handleError }: ChatMessagesProps)
     >
       <List.Section>
         <List.Item
-          title=" "
+          title={chat.title}
+          icon={
+            chat.type === "Private" ? "💬" :
+            chat.type === "Group" ? "👥" :
+            chat.type === "Channel" ? "📢" :
+            "💬"
+          }
           detail={
             <List.Item.Detail
               markdown={`
+<div align="center">
+  ${chatPhoto ? `![Avatar](${chatPhoto})` : ''}
+</div>
+
+---
+
 ${messages.length > 0 ? messages.map(msg => {
   const time = new Date(msg.date * 1000).toLocaleTimeString([], { 
     hour: '2-digit', 
@@ -147,7 +187,7 @@ ${messages.length > 0 ? messages.map(msg => {
   const sender = msg.out ? "Вы" : (msg.sender?.firstName || "Unknown");
   return `**${time} ${sender}**\n${msg.message || ""}`;
 }).reverse().join('\n\n---\n\n') : 'Нет сообщений'}
-            `}
+              `}
             />
           }
           actions={
@@ -359,27 +399,31 @@ export default function Command() {
 
                 // Если не удалось получить URL, используем дефолтные иконки
                 if (!photoUrl) {
-                  photoUrl = chatType === "Private" ? Icon.PersonCircle :
-                            chatType === "Channel" ? Icon.Globe :
-                            Icon.Person;
+                  photoUrl = chatType === "Private" ? "💬" :
+                            chatType === "Group" ? "👥" :
+                            chatType === "Channel" ? "📢" :
+                            "💬";
                 }
               } catch (downloadError) {
                 console.warn("Error with photo URL:", downloadError);
-                photoUrl = chatType === "Private" ? Icon.PersonCircle :
-                          chatType === "Channel" ? Icon.Globe :
-                          Icon.Person;
+                photoUrl = chatType === "Private" ? "💬" :
+                          chatType === "Group" ? "👥" :
+                          chatType === "Channel" ? "📢" :
+                          "💬";
               }
             } else {
               // Если нет фото, используем дефолтные иконки
-              photoUrl = chatType === "Private" ? Icon.PersonCircle :
-                        chatType === "Channel" ? Icon.Globe :
-                        Icon.Person;
+              photoUrl = chatType === "Private" ? "💬" :
+                        chatType === "Group" ? "👥" :
+                        chatType === "Channel" ? "📢" :
+                        "💬";
             }
           } catch (photoError) {
             console.warn("Error with photo:", photoError);
-            photoUrl = chatType === "Private" ? Icon.PersonCircle :
-                      chatType === "Channel" ? Icon.Globe :
-                      Icon.Person;
+            photoUrl = chatType === "Private" ? "💬" :
+                      chatType === "Group" ? "👥" :
+                      chatType === "Channel" ? "📢" :
+                      "💬";
           }
 
           return {
@@ -555,22 +599,10 @@ ${qrCode}
                 { text: chat.type }
               ]}
               icon={
-                chat.photoUrl ? 
-                  (chat.photoUrl.startsWith('http') || chat.photoUrl.startsWith('tg://') ? 
-                    {
-                      source: chat.photoUrl,
-                      mask: Image.Mask.Circle,
-                      fallback: chat.type === "Private" ? Icon.PersonCircle :
-                               chat.type === "Channel" ? Icon.Globe :
-                               Icon.Person
-                    } :
-                    { source: chat.photoUrl }
-                  ) : 
-                  { 
-                    source: chat.type === "Private" ? Icon.PersonCircle :
-                            chat.type === "Channel" ? Icon.Globe :
-                            Icon.Person
-                  }
+                chat.type === "Private" ? { source: "💬", tintColor: Color.PrimaryText } :
+                chat.type === "Group" ? { source: "👥", tintColor: Color.PrimaryText } :
+                chat.type === "Channel" ? { source: "📢", tintColor: Color.PrimaryText } :
+                { source: "💬", tintColor: Color.PrimaryText }
               }
               actions={
                 <ActionPanel>
