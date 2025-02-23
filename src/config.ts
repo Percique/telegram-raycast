@@ -1,5 +1,4 @@
-import { getPreferenceValues } from "@raycast/api";
-import { Preferences, TelegramConfig } from "./types";
+import { TelegramConfig } from "./types";
 
 export function getTelegramConfig(): TelegramConfig {
   return {

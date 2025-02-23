@@ -581,10 +581,13 @@ export default function Command() {
             title="2FA Password"
             placeholder="Enter your 2FA password"
             autoFocus
-            onSubmit={(value) => {
-              if (value.trim() && passwordResolver) {
-                passwordResolver(value.trim());
-                setPasswordResolver(null);
+            onKeyPress={(event) => {
+              if (event.key === 'Enter') {
+                const value = event.target.value as string;
+                if (value.trim() && passwordResolver) {
+                  passwordResolver(value.trim());
+                  setPasswordResolver(null);
+                }
               }
             }}
           />
