@@ -3,7 +3,7 @@
   "title": "Telegram for Raycast",
   "description": "Search through Telegram chats, channels, and messages",
   "icon": "command-icon.png",
-  "author": "robert_vaganyan",
+  "author": "percique",
   "categories": [
     "Communication"
   ],
@@ -44,7 +44,7 @@
   ],
   "dependencies": {
     "@cryptography/aes": "^0.1.1",
-    "@raycast/api": "^1.60.1",
+    "@raycast/api": "^1.85.2",
     "buffer": "^6.0.3",
     "input": "^1.0.1",
     "node-fetch": "^3.3.2",
@@ -71,6 +71,7 @@
     "build": "ray build -e dist",
     "dev": "ray develop",
     "lint": "eslint . --ext ts,tsx",
-    "format": "prettier --write 'src/**/*.{ts,tsx}'"
+    "format": "prettier --write 'src/**/*.{ts,tsx}'",
+    "publish": "ray publish"
   }
 }
