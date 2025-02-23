@@ -161,57 +161,52 @@ function ChatMessages({ chat, onClose, client, handleError }: ChatMessagesProps)
       enableFiltering={false}
       throttle={false}
     >
-      <List.Section>
+      <List.Section title={`${chat.title} ${chat.type === "Private" ? "💬" : chat.type === "Group" ? "👥" : "📢"}`}>
+        {/* Поле для ввода сообщения вверху */}
         <List.Item
-          title={chat.title}
-          icon={
-            chat.type === "Private" ? "💬" :
-            chat.type === "Group" ? "👥" :
-            chat.type === "Channel" ? "📢" :
-            "💬"
-          }
-          detail={
-            <List.Item.Detail
-              markdown={`
-<div align="center">
-  ${chatPhoto ? `![Avatar](${chatPhoto})` : ''}
-</div>
-
----
-
-${messages.length > 0 ? messages.map(msg => {
-  const time = new Date(msg.date * 1000).toLocaleTimeString([], { 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  });
-  const sender = msg.out ? "Вы" : (msg.sender?.firstName || "Unknown");
-  return `**${time} ${sender}**\n${msg.message || ""}`;
-}).reverse().join('\n\n---\n\n') : 'Нет сообщений'}
-              `}
-            />
-          }
+          title="Новое сообщение"
+          subtitle={newMessage}
           actions={
             <ActionPanel>
               <Action
-                title="Send Message"
+                title="Отправить"
                 icon={Icon.Message}
                 onAction={sendMessage}
                 shortcut={{ modifiers: [], key: "return" }}
               />
               <Action
-                title="Open in Telegram"
+                title="Открыть в Telegram"
                 icon={Icon.Globe}
                 onAction={() => openInTelegram(chat.id, chat.username)}
                 shortcut={{ modifiers: ["cmd"], key: "return" }}
               />
               <Action
-                title="Close Chat"
+                title="Закрыть"
                 icon={Icon.Xmark}
                 onAction={onClose}
               />
             </ActionPanel>
           }
         />
+
+        {/* Сообщения идут после поля ввода */}
+        {messages.map((msg, index) => {
+          const time = new Date(msg.date * 1000).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          });
+          const sender = msg.out ? "Вы" : (msg.sender?.firstName || "Unknown");
+          
+          return (
+            <List.Item
+              key={index}
+              title={sender}
+              subtitle={msg.message}
+              accessories={[{ text: time }]}
+              icon={msg.out ? "🗨️" : "💭"}
+            />
+          );
+        })}
       </List.Section>
     </List>
   );
