@@ -4,6 +4,8 @@
   "description": "Search through Telegram chats, channels, and messages",
   "icon": "command-icon.png",
   "author": "percique",
+  "owner": "percique",
+  "private": true,
   "categories": [
     "Communication"
   ],
@@ -26,7 +28,7 @@
       "placeholder": "Enter your API ID"
     },
     {
-      "name": "apiHash",
+      "name": "apiHash", 
       "type": "textfield",
       "required": true,
       "title": "API Hash",
