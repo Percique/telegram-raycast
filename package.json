@@ -18,32 +18,6 @@
       "mode": "view"
     }
   ],
-  "preferences": [
-    {
-      "name": "apiId",
-      "type": "textfield",
-      "required": true,
-      "title": "API ID",
-      "description": "Your Telegram API ID from https://my.telegram.org/apps",
-      "placeholder": "Enter your API ID"
-    },
-    {
-      "name": "apiHash", 
-      "type": "textfield",
-      "required": true,
-      "title": "API Hash",
-      "description": "Your Telegram API Hash from https://my.telegram.org/apps",
-      "placeholder": "Enter your API Hash"
-    },
-    {
-      "name": "password2FA",
-      "type": "password",
-      "required": false,
-      "title": "2FA Password",
-      "description": "Your Telegram 2FA password (if enabled)",
-      "placeholder": "Enter your 2FA password (optional)"
-    }
-  ],
   "dependencies": {
     "@cryptography/aes": "^0.1.1",
     "@raycast/api": "^1.85.2",

@@ -1,10 +1,3 @@
-export interface Preferences {
-  apiId: string;
-  apiHash: string;
-  phoneNumber: string;
-  password2FA?: string;
-}
-
 export interface Chat {
   id: string;
   title: string;

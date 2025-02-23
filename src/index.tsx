@@ -11,11 +11,12 @@ import {
   open,
   getPreferenceValues,
   Image,
+  Form,
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
-import { Chat, SESSION_KEY, Preferences, TelegramConfig } from "./types";
+import { Chat, SESSION_KEY, TelegramConfig } from "./types";
 import { getTelegramConfig } from "./config";
 import QRCode from 'qrcode';
 
@@ -221,6 +222,9 @@ export default function Command() {
   const [qrCode, setQrCode] = useState<string>("");
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [password2FA, setPassword2FA] = useState<string>("");
+  const [needPassword, setNeedPassword] = useState(false);
+  const [passwordResolver, setPasswordResolver] = useState<((value: string) => void) | null>(null);
 
   useEffect(() => {
     initTelegram();
@@ -286,6 +290,9 @@ export default function Command() {
           reject(new Error("Authorization timeout"));
         }, 180000);
 
+        let isPasswordRequired = false;
+        let passwordPromise: Promise<string> | null = null;
+
         client.signInUserWithQrCode(
           { apiId: Number(config.apiId), apiHash: config.apiHash },
           {
@@ -296,42 +303,70 @@ export default function Command() {
               await generateQRCode(qrUrl);
             },
             onError: async (error: Error) => {
-              clearTimeout(timeout);
+              console.log("QR auth error:", error.message);
+              if (error.message.includes("2FA")) {
+                isPasswordRequired = true;
+                setNeedPassword(true);
+                return false;
+              }
               reject(error);
-              return Promise.resolve(true);
+              return true;
             },
             password: async () => {
-              const preferences = getPreferenceValues<Preferences>();
-              const password = preferences.password2FA;
-              
-              if (!password) {
-                throw new Error("2FA password required. Please set it in the extension preferences.");
+              console.log("Password requested by Telegram");
+              isPasswordRequired = true;
+              setNeedPassword(true);
+
+              try {
+                passwordPromise = new Promise<string>((resolvePassword) => {
+                  setPasswordResolver(() => (password: string) => {
+                    console.log("Password received from form, length:", password.length);
+                    resolvePassword(password);
+                  });
+                });
+
+                const password = await passwordPromise;
+                console.log("Returning password to Telegram");
+                return password;
+              } catch (error) {
+                console.error("Password error:", error);
+                reject(error);
+                throw error;
               }
-              
-              return password;
             }
           }
         );
 
-        const checkInterval = setInterval(async () => {
-          if (await client.isUserAuthorized()) {
-            clearInterval(checkInterval);
-            clearTimeout(timeout);
-            resolve(true);
+        // Проверяем статус авторизации каждую секунду
+        const authCheck = setInterval(async () => {
+          try {
+            const isAuthorized = await client.isUserAuthorized();
+            if (isAuthorized) {
+              clearInterval(authCheck);
+              clearTimeout(timeout);
+              const session = client.session.save() as unknown as string;
+              await LocalStorage.setItem(SESSION_KEY, session);
+              setNeedAuth(false);
+              setNeedPassword(false);
+              setPasswordResolver(null);
+              resolve(true);
+            }
+          } catch (error) {
+            console.warn("Auth check error:", error);
           }
         }, 1000);
       });
 
-      const session = client.session.save() as unknown as string;
-      await LocalStorage.setItem(SESSION_KEY, session);
-      setNeedAuth(false);
       await loadChats(client);
     } catch (error) {
-      if (error instanceof Error && error.message.includes("AUTH_TOKEN_EXPIRED")) {
-        await clearSession();
-        await initTelegram();
-      } else {
-        throw error;
+      console.error("QR Auth error:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("AUTH_TOKEN_EXPIRED")) {
+          await clearSession();
+          await initTelegram();
+        } else {
+          await handleError(error);
+        }
       }
     }
   }
@@ -513,6 +548,50 @@ export default function Command() {
   }
 
   if (needAuth) {
+    if (needPassword) {
+      return (
+        <Form
+          actions={
+            <ActionPanel>
+              <Action.SubmitForm
+                title="Submit Password"
+                onSubmit={async (values) => {
+                  console.log("Submitting 2FA password...");
+                  const password = values.password.trim();
+                  if (!password) {
+                    await showToast({
+                      style: Toast.Style.Failure,
+                      title: "Error",
+                      message: "Password cannot be empty"
+                    });
+                    return;
+                  }
+                  if (passwordResolver) {
+                    passwordResolver(password);
+                    setPasswordResolver(null);
+                  }
+                }}
+              />
+            </ActionPanel>
+          }
+        >
+          <Form.Description text="Please enter your 2FA password to complete the authorization." />
+          <Form.PasswordField
+            id="password"
+            title="2FA Password"
+            placeholder="Enter your 2FA password"
+            autoFocus
+            onSubmit={(value) => {
+              if (value.trim() && passwordResolver) {
+                passwordResolver(value.trim());
+                setPasswordResolver(null);
+              }
+            }}
+          />
+        </Form>
+      );
+    }
+
     return (
       <Detail
         isLoading={isLoading}
