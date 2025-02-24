@@ -1,0 +1,115 @@
+// src/components/FolderSettings.tsx
+
+import { ActionPanel, Action, List, showToast, Toast, Icon, Color } from "@raycast/api";
+import { useEffect, useState, useCallback } from "react";
+import { TelegramClient } from "telegram";
+import { Api } from "telegram/tl";
+import { DialogFilter, TelegramFolder } from "../types";
+
+interface FolderSettingsProps {
+  client: TelegramClient;
+  currentFolderId?: number;
+  onFolderSelect: (folderId?: number) => Promise<void>;
+}
+
+export function FolderSettings({ client, currentFolderId, onFolderSelect }: FolderSettingsProps) {
+  const [folders, setFolders] = useState<TelegramFolder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadFolders = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get all dialog filters (folders)
+      const result = await client.invoke(new Api.messages.GetDialogFilters());
+      
+      if (!result || !result.filters) {
+        throw new Error("Failed to load folders");
+      }
+
+      // Map the API response to our simpler model
+      const mappedFolders: TelegramFolder[] = result.filters.map((filter: DialogFilter) => {
+        return {
+          id: filter.id || 0,
+          title: typeof filter.title === 'string' ? filter.title : filter.title?.text || "Unnamed Folder",
+          emoticon: filter.emoticon || "",
+          includePeers: filter.include_peers || [],
+          excludePeers: filter.exclude_peers || [],
+          pinnedPeers: filter.pinned_peers || []
+        };
+      });
+
+      // Add the default "All Chats" option
+      const allFolders: TelegramFolder[] = [
+        {
+          id: 0,
+          title: "All Chats",
+          emoticon: ""
+        },
+        ...mappedFolders
+      ];
+
+      setFolders(allFolders);
+    } catch (error) {
+      console.error("Error loading folders:", error);
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Error",
+        message: error instanceof Error ? error.message : String(error)
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [client]);
+
+  useEffect(() => {
+    loadFolders();
+  }, [loadFolders]);
+
+  return (
+    <List
+      isLoading={isLoading}
+      navigationTitle="Select Folder"
+      searchBarPlaceholder="Search folders..."
+    >
+      <List.Section title="Telegram Folders">
+        {folders.map((folder) => (
+          <List.Item
+            key={folder.id}
+            title={folder.title}
+            subtitle={folder.emoticon}
+            icon={{ 
+              source: folder.id === 0 ? Icon.List : Icon.Folder,
+              tintColor: folder.id === currentFolderId ? Color.Blue : Color.PrimaryText
+            }}
+            accessories={[
+              folder.id === currentFolderId ? { icon: Icon.Checkmark, tooltip: "Current selection" } : {}
+            ]}
+            actions={
+              <ActionPanel>
+                <Action
+                  title="Select Folder"
+                  icon={Icon.Folder}
+                  onAction={async () => {
+                    await onFolderSelect(folder.id);
+                    await showToast({
+                      style: Toast.Style.Success,
+                      title: "Folder Selected",
+                      message: `Now showing chats from "${folder.title}"`
+                    });
+                  }}
+                />
+                <Action
+                  title="Refresh Folders"
+                  icon={Icon.ArrowClockwise}
+                  shortcut={{ modifiers: ["cmd"], key: "r" }}
+                  onAction={loadFolders}
+                />
+              </ActionPanel>
+            }
+          />
+        ))}
+      </List.Section>
+    </List>
+  );
+}
