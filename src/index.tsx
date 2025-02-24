@@ -150,7 +150,7 @@ function ChatMessages({ chat, onClose, client, handleError }: ChatMessagesProps)
                 title="Close"
                 icon={Icon.Xmark}
                 onAction={onClose}
-                shortcut={{ modifiers: ["cmd"], key: "escape" }}
+                shortcut={{ modifiers: ["cmd"], key: "z" }}
               />
               <Action
                 title="Refresh"
@@ -187,7 +187,7 @@ function ChatMessages({ chat, onClose, client, handleError }: ChatMessagesProps)
                   title="Close"
                   icon={Icon.Xmark}
                   onAction={onClose}
-                  shortcut={{ modifiers: ["cmd"], key: "escape" }}
+                  shortcut={{ modifiers: ["cmd"], key: "z" }}
                 />
               </ActionPanel>
             }
