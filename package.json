@@ -13,8 +13,8 @@
   "commands": [
     {
       "name": "index",
-      "title": "Search Telegram",
-      "description": "Search through your Telegram chats and messages",
+      "title": "Telegram for Raycast",
+      "description": "Use your Telegram through Raycast",
       "mode": "view"
     }
   ],
