@@ -73,7 +73,7 @@ export async function getChats(client: TelegramClient, folderId?: number): Promi
       // Используем API getDialogs с правильным параметром для папок
       const result = await client.getDialogs({
         limit: 100,
-        folderIds: [folderId] // Используем правильный формат запроса
+        folder: folderId // Используем правильный параметр
       });
       
       dialogs = Array.isArray(result) ? result : [];

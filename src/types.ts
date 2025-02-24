@@ -37,9 +37,9 @@ export interface TelegramFolder {
   id: number;
   title: string;
   emoticon: string;
-  includePeers?: any[];
-  excludePeers?: any[];
-  pinnedPeers?: any[];
+  includePeers: any[];
+  excludePeers: any[];
+  pinnedPeers: any[];
 }
 
 export interface Preferences {
@@ -73,13 +73,12 @@ export interface TelegramDialog {
 }
 
 export interface DialogFilter {
-  _: 'dialogFilter' | 'dialogFilterChatlist';
-  id: number;
-  title: string | { text: string };
+  id?: number;
+  title?: string | { text: string };
   emoticon?: string;
-  include_peers: any[];
-  exclude_peers: any[];
-  pinned_peers: any[];
+  include_peers?: any[];
+  exclude_peers?: any[];
+  pinned_peers?: any[];
 }
 
 export interface GetDialogFilterResult {

@@ -127,7 +127,7 @@ function ChatMessages({ chat, onClose, client, handleError }: {
             date: msg.date || 0,
             message: sanitizeText(msg.message) || "",
             out: Boolean(msg.out),
-            sender: msg.sender ? {
+            sender: msg.sender && 'firstName' in msg.sender ? {
               firstName: sanitizeText(msg.sender.firstName) || "Unknown"
             } : undefined
           };
@@ -518,15 +518,16 @@ export default function Command() {
               offsetDate: 0,
               offsetId: 0,
               offsetPeer: new Api.InputPeerEmpty(),
-              limit: 500, // Увеличенный лимит чатов
+              limit: 500,
               excludePinned: false,
               folderId: folderId
             })
           );
 
-          if (result && result.dialogs) {
-            console.log(`Received ${result.dialogs.length} dialogs from folder`);
-            dialogs = result.dialogs;
+          if (result && 'messages' in result) {
+            const dialogsList = Array.isArray(result.dialogs) ? result.dialogs : [];
+            console.log(`Received ${dialogsList.length} dialogs from folder`);
+            dialogs = dialogsList;
           }
         } catch (error) {
           console.error("Error using folder_id parameter:", error);
@@ -694,12 +695,14 @@ export default function Command() {
         console.log(`Saving ${pinnedPeers.length} pinned_peers to cache`);
         
         // Преобразуем pinnedPeers IDs в формат строк
-        const pinnedPeerIds = pinnedPeers.map(peer => {
-          if (peer.userId) return { type: "user", id: peer.userId.toString() };
-          if (peer.channelId) return { type: "channel", id: `-100${peer.channelId}` };
-          if (peer.chatId) return { type: "chat", id: `-${peer.chatId}` };
-          return null;
-        }).filter(Boolean);
+        const pinnedPeerIds = pinnedPeers
+          .map(peer => {
+            if (peer.userId) return { type: "user", id: peer.userId.toString() };
+            if (peer.channelId) return { type: "channel", id: `-100${peer.channelId}` };
+            if (peer.chatId) return { type: "chat", id: `-${peer.chatId}` };
+            return null;
+          })
+          .filter((peer): peer is { type: string; id: string } => peer !== null);
         
         // Сохраняем преобразованные ID в кэше
         await LocalStorage.setItem(FOLDER_PINNED_PEERS_KEY, JSON.stringify(pinnedPeerIds));
