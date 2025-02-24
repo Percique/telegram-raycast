@@ -1,7 +1,7 @@
 {
   "name": "telegram-raycast",
   "title": "Telegram for Raycast",
-  "description": "Search through Telegram chats, channels, and messages",
+  "description": "Use your Telegram through Raycast",
   "icon": "command-icon.png",
   "author": "robert_vaganyan",
   "owner": "percique",
