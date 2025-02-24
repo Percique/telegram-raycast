@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { TelegramClient } from "telegram";
 import { Api } from "telegram/tl";
 import { DialogFilter } from "../types";
+import { sanitizeText } from "../utils/telegramUtils";
 
 interface FolderSettingsProps {
   client: TelegramClient;

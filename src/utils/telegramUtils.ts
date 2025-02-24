@@ -9,11 +9,17 @@ import QRCode from 'qrcode';
  */
 export function sanitizeText(text: string | undefined): string {
   if (!text) return "";
-  return text
-    .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
-    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF]/g, "")
-    .trim()
-    .substring(0, 1000); // Limit length for safety
+  
+  try {
+    return text
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+      .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF]/g, "")
+      .trim()
+      .substring(0, 1000);
+  } catch (e) {
+    console.error("Error sanitizing text:", e);
+    return "";
+  }
 }
 
 /**
