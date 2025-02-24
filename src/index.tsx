@@ -49,23 +49,6 @@ interface DialogEntity {
   about?: string;
 }
 
-// Добавляем интерфейсы для типизации
-interface TelegramPhoto {
-  _: string;
-  id: string;
-  sizes: Array<{
-    _: string;
-    type: string;
-    bytes: Uint8Array;
-  }>;
-}
-
-interface TelegramPhotosResponse {
-  _: string;
-  photos: TelegramPhoto[];
-  users: any[];
-}
-
 // Resolves opening chats in Telegram
 async function openInTelegram(chatId: string, username: string | undefined) {
   if (username) {
@@ -87,35 +70,24 @@ async function openInTelegram(chatId: string, username: string | undefined) {
   }
 }
 
+// Добавляем функцию для безопасной очистки текста
+function sanitizeText(text: string | undefined): string {
+  if (!text) return "";
+  return text
+    .replace(/[\u0000-\u001F\u007F-\u009F\uD800-\uDFFF]/g, "") // Удаляем управляющие символы и суррогатные пары
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "") // Удаляем эмодзи
+    .trim();
+}
+
 // Updated ChatMessages component with proper typing
 function ChatMessages({ chat, onClose, client, handleError }: ChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [chatPhoto, setChatPhoto] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     loadMessages();
-    loadChatPhoto();
   }, []);
-
-  async function loadChatPhoto() {
-    try {
-      if (!client) return;
-
-      const entity = await client.getEntity(chat.id);
-      if (entity && 'photo' in entity && entity.photo) {
-        const buffer = await client.downloadProfilePhoto(entity);
-        if (buffer) {
-          const blob = new Blob([buffer], { type: 'image/jpeg' });
-          const photoUrl = URL.createObjectURL(blob);
-          setChatPhoto(photoUrl);
-        }
-      }
-    } catch (error) {
-      console.warn("Error loading chat photo:", error);
-    }
-  }
 
   async function loadMessages() {
     try {
@@ -123,7 +95,14 @@ function ChatMessages({ chat, onClose, client, handleError }: ChatMessagesProps)
       const result = await client.getMessages(chat.id, {
         limit: 30
       });
-      setMessages(result as Message[] || []);
+      const sanitizedMessages = (result as Message[]).map(msg => ({
+        ...msg,
+        message: sanitizeText(msg.message),
+        sender: msg.sender ? {
+          firstName: sanitizeText(msg.sender.firstName)
+        } : undefined
+      }));
+      setMessages(sanitizedMessages);
     } catch (error) {
       console.error("Error loading messages:", error);
       await handleError(error);
@@ -135,7 +114,7 @@ function ChatMessages({ chat, onClose, client, handleError }: ChatMessagesProps)
   async function sendMessage() {
     if (!newMessage.trim() || !client) return;
     try {
-      await client.sendMessage(chat.id, { message: newMessage });
+      await client.sendMessage(chat.id, { message: sanitizeText(newMessage) });
       setNewMessage("");
       await loadMessages();
     } catch (error) {
@@ -144,70 +123,76 @@ function ChatMessages({ chat, onClose, client, handleError }: ChatMessagesProps)
     }
   }
 
-  useEffect(() => {
-    return () => {
-      if (chatPhoto) {
-        URL.revokeObjectURL(chatPhoto);
-      }
-    };
-  }, [chatPhoto]);
-
   return (
     <List
       isLoading={isLoading}
-      searchBarPlaceholder="Написать сообщение..."
+      searchBarPlaceholder="Write a message..."
       onSearchTextChange={setNewMessage}
       searchText={newMessage}
       navigationTitle={chat.title}
       enableFiltering={false}
       throttle={false}
     >
-      <List.Section title={`${chat.title} ${chat.type === "Private" ? "💬" : chat.type === "Group" ? "👥" : "📢"}`}>
-        {/* Поле для ввода сообщения вверху */}
+      <List.Section title={chat.title}>
         <List.Item
-          title="Новое сообщение"
+          title="New Message"
           subtitle={newMessage}
+          icon={Icon.Message}
           actions={
             <ActionPanel>
               <Action
-                title="Отправить"
+                title="Send"
                 icon={Icon.Message}
                 onAction={sendMessage}
                 shortcut={{ modifiers: [], key: "return" }}
               />
               <Action
-                title="Открыть в Telegram"
-                icon={Icon.Globe}
-                onAction={() => openInTelegram(chat.id, chat.username)}
-                shortcut={{ modifiers: ["cmd"], key: "return" }}
-              />
-              <Action
-                title="Закрыть"
+                title="Close"
                 icon={Icon.Xmark}
                 onAction={onClose}
+                shortcut={{ modifiers: ["cmd"], key: "escape" }}
+              />
+              <Action
+                title="Refresh"
+                icon={Icon.ArrowClockwise}
+                onAction={loadMessages}
+                shortcut={{ modifiers: ["cmd"], key: "r" }}
               />
             </ActionPanel>
           }
         />
-
-        {/* Сообщения идут после поля ввода */}
-        {messages.map((msg, index) => {
-          const time = new Date(msg.date * 1000).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          });
-          const sender = msg.out ? "Вы" : (msg.sender?.firstName || "Unknown");
-          
-          return (
-            <List.Item
-              key={index}
-              title={sender}
-              subtitle={msg.message}
-              accessories={[{ text: time }]}
-              icon={msg.out ? "🗨️" : "💭"}
-            />
-          );
-        })}
+        {messages.map((msg, index) => (
+          <List.Item
+            key={index}
+            title={msg.out ? "You" : (msg.sender?.firstName || "Unknown")}
+            subtitle={msg.message}
+            accessories={[{ 
+              text: new Date(msg.date * 1000).toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })
+            }]}
+            icon={{ 
+              source: Icon.Message,
+              tintColor: msg.out ? Color.Blue : Color.Green 
+            }}
+            actions={
+              <ActionPanel>
+                <Action.CopyToClipboard
+                  title="Copy Message"
+                  content={msg.message}
+                  shortcut={{ modifiers: ["cmd"], key: "c" }}
+                />
+                <Action
+                  title="Close"
+                  icon={Icon.Xmark}
+                  onAction={onClose}
+                  shortcut={{ modifiers: ["cmd"], key: "escape" }}
+                />
+              </ActionPanel>
+            }
+          />
+        ))}
       </List.Section>
     </List>
   );
@@ -373,18 +358,6 @@ export default function Command() {
 
   async function loadChats(telegramClient: TelegramClient) {
     try {
-      console.log("Loading chats...");
-      setIsLoading(true);
-      
-      // Проверяем авторизацию перед загрузкой чатов
-      const isAuthorized = await telegramClient.isUserAuthorized().catch(() => false);
-      if (!isAuthorized) {
-        console.log("Not authorized, clearing session...");
-        await clearSession();
-        await initTelegram();
-        return;
-      }
-
       const dialogs = await telegramClient.getDialogs({
         limit: 100
       });
@@ -402,69 +375,17 @@ export default function Command() {
           
           let peerId = entity?.id?.toString() || "";
           if (chatType === "Group" || chatType === "Channel") {
-            peerId = `-100${Math.abs(Number(entity?.id))}`;
-          } else if (chatType === "Private") {
-            peerId = entity?.id?.toString() || "";
-          }
-
-          const sanitizeText = (text: string | undefined) => {
-            if (!text) return "";
-            // Используем более безопасный способ удаления управляющих символов
-            return text.replace(/[\x00-\x1F\x7F-\x9F]/gu, "");
-          };
-
-          let photoUrl: string | undefined;
-          try {
-            if (entity && 'photo' in entity && entity.photo) {
-              try {
-                // Используем прямые ссылки на аватарки
-                if (entity.username) {
-                  // Для публичных чатов/каналов/пользователей
-                  photoUrl = `https://t.me/${entity.username}/photo`;
-                } else if (entity.id) {
-                  // Для приватных чатов используем ID
-                  const peerType = entity.className?.toLowerCase() || 'user';
-                  photoUrl = `tg://peer?id=${entity.id}&type=${peerType}`;
-                }
-
-                // Если не удалось получить URL, используем дефолтные иконки
-                if (!photoUrl) {
-                  photoUrl = chatType === "Private" ? "💬" :
-                            chatType === "Group" ? "👥" :
-                            chatType === "Channel" ? "📢" :
-                            "💬";
-                }
-              } catch (downloadError) {
-                console.warn("Error with photo URL:", downloadError);
-                photoUrl = chatType === "Private" ? "💬" :
-                          chatType === "Group" ? "👥" :
-                          chatType === "Channel" ? "📢" :
-                          "💬";
-              }
-            } else {
-              // Если нет фото, используем дефолтные иконки
-              photoUrl = chatType === "Private" ? "💬" :
-                        chatType === "Group" ? "👥" :
-                        chatType === "Channel" ? "📢" :
-                        "💬";
-            }
-          } catch (photoError) {
-            console.warn("Error with photo:", photoError);
-            photoUrl = chatType === "Private" ? "💬" :
-                      chatType === "Group" ? "👥" :
-                      chatType === "Channel" ? "📢" :
-                      "💬";
+            peerId = `-100${peerId}`;
           }
 
           return {
             id: peerId,
-            username: entity?.username || "",
+            username: sanitizeText(entity?.username),
             title: sanitizeText(entity?.title || entity?.firstName) || "Unknown Chat",
             type: chatType,
             unreadCount: dialog.unreadCount || 0,
-            lastMessage: sanitizeText(dialog.message?.message)?.substring(0, 100) || "",
-            description: sanitizeText(entity?.about) || "",
-            photoUrl
+            lastMessage: sanitizeText(dialog.message?.message)?.substring(0, 100),
+            description: sanitizeText(entity?.about)
           };
         })
       );
@@ -473,8 +394,6 @@ export default function Command() {
     } catch (error) {
       console.error("Error loading chats:", error);
       await handleError(error);
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -524,17 +443,6 @@ export default function Command() {
       console.error("Error generating QR code:", err);
     }
   }
-
-  useEffect(() => {
-    return () => {
-      // Очищаем URL объекты при размонтировании
-      chats.forEach(chat => {
-        if (chat.photoUrl) {
-          URL.revokeObjectURL(chat.photoUrl);
-        }
-      });
-    };
-  }, [chats]);
 
   if (selectedChat) {
     return (
@@ -644,15 +552,6 @@ ${qrCode}
     );
   });
 
-  function ErrorBoundary({ children }: { children: React.ReactNode }) {
-    try {
-      return <>{children}</>;
-    } catch (error) {
-      console.error("Render error:", error);
-      return <List.Item title="Display Error" />;
-    }
-  }
-
   return (
     <List
       isLoading={isLoading}
@@ -661,48 +560,44 @@ ${qrCode}
     >
       <List.Section title="Chats">
         {filteredChats.map((chat) => (
-          <ErrorBoundary key={chat.id}>
-            <List.Item
-              key={chat.id}
-              title={chat.title}
-              subtitle={chat.lastMessage}
-              accessories={[
-                {
-                  text: chat.unreadCount ? String(chat.unreadCount) : undefined,
-                  icon: chat.unreadCount 
-                    ? { source: Icon.Dot, tintColor: Color.Red } 
-                    : undefined
-                },
-                { text: chat.type }
-              ]}
-              icon={
-                chat.type === "Private" ? { source: "💬", tintColor: Color.PrimaryText } :
-                chat.type === "Group" ? { source: "👥", tintColor: Color.PrimaryText } :
-                chat.type === "Channel" ? { source: "📢", tintColor: Color.PrimaryText } :
-                { source: "💬", tintColor: Color.PrimaryText }
-              }
-              actions={
-                <ActionPanel>
-                  <Action
-                    title="View Messages"
-                    icon={Icon.Message}
-                    onAction={() => setSelectedChat(chat)}
-                  />
-                  <Action
-                    title="Open in Telegram"
-                    icon={Icon.Globe}
-                    shortcut={{ modifiers: ["cmd"], key: "return" }}
-                    onAction={() => openInTelegram(chat.id, chat.username)}
-                  />
-                  <Action.CopyToClipboard
-                    title="Copy Chat ID"
-                    content={String(chat.id)}
-                    shortcut={{ modifiers: ["cmd"], key: "c" }}
-                  />
-                </ActionPanel>
-              }
-            />
-          </ErrorBoundary>
+          <List.Item
+            key={chat.id}
+            title={chat.title}
+            subtitle={chat.lastMessage}
+            accessories={[
+              {
+                text: chat.unreadCount ? String(chat.unreadCount) : undefined,
+                icon: chat.unreadCount ? { source: Icon.Dot, tintColor: Color.Red } : undefined
+              },
+              { text: chat.type }
+            ]}
+            icon={
+              chat.type === "Private" ? { source: Icon.PersonCircle, tintColor: Color.Blue } :
+              chat.type === "Group" ? { source: Icon.TwoPeople, tintColor: Color.Green } :
+              chat.type === "Channel" ? { source: Icon.Megaphone, tintColor: Color.Orange } :
+              Icon.Message
+            }
+            actions={
+              <ActionPanel>
+                <Action
+                  title="View Messages"
+                  icon={Icon.Message}
+                  onAction={() => setSelectedChat(chat)}
+                />
+                <Action
+                  title="Open in Telegram"
+                  icon={Icon.Globe}
+                  shortcut={{ modifiers: ["cmd"], key: "return" }}
+                  onAction={() => openInTelegram(chat.id, chat.username)}
+                />
+                <Action.CopyToClipboard
+                  title="Copy Chat ID"
+                  content={String(chat.id)}
+                  shortcut={{ modifiers: ["cmd"], key: "c" }}
+                />
+              </ActionPanel>
+            }
+          />
         ))}
       </List.Section>
     </List>

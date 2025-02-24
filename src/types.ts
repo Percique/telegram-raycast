@@ -6,7 +6,6 @@ export interface Chat {
   lastMessage?: string;
   description?: string;
   username?: string;
-  photoUrl?: string;
 }
 
 export interface TelegramConfig {
