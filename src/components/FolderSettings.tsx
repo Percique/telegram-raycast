@@ -4,12 +4,21 @@ import { ActionPanel, Action, List, showToast, Toast, Icon, Color } from "@rayca
 import { useEffect, useState, useCallback } from "react";
 import { TelegramClient } from "telegram";
 import { Api } from "telegram/tl";
-import { DialogFilter, TelegramFolder } from "../types";
+import { DialogFilter } from "../types";
 
 interface FolderSettingsProps {
   client: TelegramClient;
   currentFolderId?: number;
   onFolderSelect: (folderId?: number) => Promise<void>;
+}
+
+interface TelegramFolder {
+  id: number;
+  title: string;
+  emoticon?: string;
+  includePeers?: any[];
+  excludePeers?: any[];
+  pinnedPeers?: any[];
 }
 
 export function FolderSettings({ client, currentFolderId, onFolderSelect }: FolderSettingsProps) {
@@ -28,23 +37,40 @@ export function FolderSettings({ client, currentFolderId, onFolderSelect }: Fold
       }
 
       // Map the API response to our simpler model
-      const mappedFolders: TelegramFolder[] = result.filters.map((filter: DialogFilter) => {
-        return {
-          id: filter.id || 0,
-          title: typeof filter.title === 'string' ? filter.title : filter.title?.text || "Unnamed Folder",
-          emoticon: filter.emoticon || "",
-          includePeers: filter.include_peers || [],
-          excludePeers: filter.exclude_peers || [],
-          pinnedPeers: filter.pinned_peers || []
-        };
-      });
+      const mappedFolders = result.filters.map((filter: any) => {
+        try {
+          const folder: TelegramFolder = {
+            id: filter.id || 0,
+            title: typeof filter.title === 'string' ? sanitizeText(filter.title) : 
+                   filter.title?.text ? sanitizeText(filter.title.text) : "Unnamed Folder",
+            emoticon: filter.emoticon ? sanitizeText(filter.emoticon) : "",
+            includePeers: filter.include_peers || [],
+            excludePeers: filter.exclude_peers || [],
+            pinnedPeers: filter.pinned_peers || []
+          };
+          return folder;
+        } catch (e) {
+          console.error("Error processing folder:", e);
+          return {
+            id: 0,
+            title: "Error Folder",
+            emoticon: "",
+            includePeers: [],
+            excludePeers: [],
+            pinnedPeers: []
+          };
+        }
+      }).filter(f => f.id !== 0);
 
       // Add the default "All Chats" option
       const allFolders: TelegramFolder[] = [
         {
           id: 0,
           title: "All Chats",
-          emoticon: ""
+          emoticon: "",
+          includePeers: [],
+          excludePeers: [],
+          pinnedPeers: []
         },
         ...mappedFolders
       ];

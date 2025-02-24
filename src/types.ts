@@ -36,7 +36,7 @@ export interface PhotoSize {
 export interface TelegramFolder {
   id: number;
   title: string;
-  emoticon: string;
+  emoticon?: string;
   includePeers: any[];
   excludePeers: any[];
   pinnedPeers: any[];
@@ -85,4 +85,9 @@ export interface GetDialogFilterResult {
   _: string;
   filter?: DialogFilter;
   filters?: DialogFilter[];
+}
+
+export interface Peer {
+  type: string;
+  id: string;
 }

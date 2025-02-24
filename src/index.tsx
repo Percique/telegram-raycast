@@ -396,6 +396,12 @@ function FolderSettings({ client, currentFolderId, onFolderSelect, navigation }:
   );
 }
 
+// Определяем интерфейс для пиров
+interface Peer {
+  type: string;
+  id: string;
+}
+
 export default function Command() {
   const { push, pop } = useNavigation();
   const [isLoading, setIsLoading] = useState(true);
@@ -666,25 +672,23 @@ export default function Command() {
       await LocalStorage.setItem(SELECTED_FOLDER_ID_KEY, folderId || 0);
       
       // Список всех пиров (включенные + закрепленные) для фильтрации
-      let allPeers: { type: string; id: string }[] = [];
+      let allPeers: Peer[] = [];
       
       // Обработка includePeers
       if (folderId && folderId !== 0 && includePeers && includePeers.length > 0) {
         console.log(`Saving ${includePeers.length} include_peers to cache`);
         
-        // Преобразуем peer IDs в формат строк для сохранения
-        const includePeerIds = includePeers.map(peer => {
-          if (peer.userId) return { type: "user", id: peer.userId.toString() };
-          if (peer.channelId) return { type: "channel", id: `-100${peer.channelId}` };
-          if (peer.chatId) return { type: "chat", id: `-${peer.chatId}` };
-          return null;
-        }).filter(Boolean);
+        const includePeerIds = includePeers
+          .map(peer => {
+            if (peer.userId) return { type: "user", id: peer.userId.toString() };
+            if (peer.channelId) return { type: "channel", id: `-100${peer.channelId}` };
+            if (peer.chatId) return { type: "chat", id: `-${peer.chatId}` };
+            return null;
+          })
+          .filter((peer): peer is Peer => peer !== null);
         
-        // Сохраняем преобразованные ID в кэше
         await LocalStorage.setItem(FOLDER_INCLUDE_PEERS_KEY, JSON.stringify(includePeerIds));
-        
-        // Добавляем в общий список пиров
-        allPeers = [...includePeerIds];
+        allPeers = includePeerIds;
       } else {
         // Очищаем кэш includePeers если выбрана папка "All Chats"
         await LocalStorage.removeItem(FOLDER_INCLUDE_PEERS_KEY);
@@ -694,7 +698,6 @@ export default function Command() {
       if (folderId && folderId !== 0 && pinnedPeers && pinnedPeers.length > 0) {
         console.log(`Saving ${pinnedPeers.length} pinned_peers to cache`);
         
-        // Преобразуем pinnedPeers IDs в формат строк
         const pinnedPeerIds = pinnedPeers
           .map(peer => {
             if (peer.userId) return { type: "user", id: peer.userId.toString() };
@@ -702,12 +705,11 @@ export default function Command() {
             if (peer.chatId) return { type: "chat", id: `-${peer.chatId}` };
             return null;
           })
-          .filter((peer): peer is { type: string; id: string } => peer !== null);
+          .filter((peer): peer is Peer => peer !== null);
         
-        // Сохраняем преобразованные ID в кэше
         await LocalStorage.setItem(FOLDER_PINNED_PEERS_KEY, JSON.stringify(pinnedPeerIds));
         
-        // Добавляем в общий список пиров, исключая дубликаты
+        // Добавляем закрепленные чаты, исключая дубликаты
         pinnedPeerIds.forEach(pinnedPeer => {
           if (!allPeers.some(p => p.id === pinnedPeer.id)) {
             allPeers.push(pinnedPeer);
