@@ -510,7 +510,7 @@ export default function Command() {
         // For "All Chats" folder
         console.log("Loading all chats...");
         const result = await telegramClient.getDialogs({
-          limit: 500 // Увеличенный лимит чатов
+          limit: 150 // Увеличенный лимит чатов
         });
         dialogs = Array.isArray(result) ? result : [];
       } else {
@@ -524,7 +524,7 @@ export default function Command() {
               offsetDate: 0,
               offsetId: 0,
               offsetPeer: new Api.InputPeerEmpty(),
-              limit: 500,
+              limit: 150,
               excludePinned: false,
               folderId: folderId
             })
@@ -540,7 +540,7 @@ export default function Command() {
           console.log("Falling back to regular getDialogs without filter...");
           
           const result = await telegramClient.getDialogs({
-            limit: 500 // Увеличенный лимит чатов
+            limit: 150 // Увеличенный лимит чатов
           });
           dialogs = Array.isArray(result) ? result : [];
         }
@@ -727,7 +727,7 @@ export default function Command() {
         if (client) {
           setIsLoading(true);
           const result = await client.getDialogs({
-            limit: 500 // Увеличенный лимит чатов
+            limit: 150 // Увеличенный лимит чатов
           });
           
           const dialogs = Array.isArray(result) ? result : [];
@@ -845,7 +845,7 @@ export default function Command() {
               // Загружаем чаты и применяем сохраненный фильтр
               setIsLoading(true);
               const result = await newClient.getDialogs({
-                limit: 500 // Увеличенный лимит чатов
+                limit: 150 // Увеличенный лимит чатов
               });
               
               const dialogs = Array.isArray(result) ? result : [];
