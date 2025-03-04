@@ -37,6 +37,17 @@ import {
     lastUsed: number;
   }
   
+  // Добавляем типы для сущностей Telegram
+  interface TelegramEntity {
+    id?: number | bigint;
+    className?: string;
+    megagroup?: boolean;
+    title?: string;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+  }
+  
   /**
    * Компонент для отображения и взаимодействия с сообщениями чата
    */
@@ -65,7 +76,7 @@ import {
         if (!client) throw new Error("Клиент не инициализирован");
         setIsLoading(true);
         
-        let entity;
+        let entity: TelegramEntity;
         let chatId = chatIdentifier;
         
         // Если это имя пользователя, сначала получаем информацию о пользователе
@@ -75,13 +86,22 @@ import {
               ? chatIdentifier.substring(1) 
               : chatIdentifier;
             
-            // Получаем информацию о сущности по имени пользователя
-            entity = await client.getEntity(username);
+            // Получаем информацию о сущности по имени пользователя и преобразуем в нужный тип
+            const rawEntity = await client.getEntity(username);
+            entity = {
+              id: rawEntity.id ? Number(rawEntity.id) : undefined,
+              className: rawEntity.className,
+              megagroup: 'megagroup' in rawEntity ? rawEntity.megagroup : undefined,
+              title: 'title' in rawEntity ? rawEntity.title : undefined,
+              firstName: 'firstName' in rawEntity ? rawEntity.firstName : undefined,
+              lastName: 'lastName' in rawEntity ? rawEntity.lastName : undefined,
+              username: 'username' in rawEntity ? rawEntity.username : undefined
+            };
             
             if (entity) {
               // Определяем тип чата и формируем правильный ID
               let type: ChatType = "Private";
-              let peerId = entity.id?.toString() || "";
+              let peerId = entity.id ? entity.id.toString() : "";
               
               if (entity.className === "Channel") {
                 type = entity.megagroup ? "Group" : "Channel";
@@ -114,7 +134,16 @@ import {
         } else {
           // Если это числовой ID, пытаемся получить информацию о чате
           try {
-            entity = await client.getEntity(chatIdentifier);
+            const rawEntity = await client.getEntity(chatIdentifier);
+            entity = {
+              id: rawEntity.id ? Number(rawEntity.id) : undefined,
+              className: rawEntity.className,
+              megagroup: 'megagroup' in rawEntity ? rawEntity.megagroup : undefined,
+              title: 'title' in rawEntity ? rawEntity.title : undefined,
+              firstName: 'firstName' in rawEntity ? rawEntity.firstName : undefined,
+              lastName: 'lastName' in rawEntity ? rawEntity.lastName : undefined,
+              username: 'username' in rawEntity ? rawEntity.username : undefined
+            };
             
             if (entity) {
               let type: ChatType = "Private";
