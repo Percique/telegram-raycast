@@ -16,6 +16,12 @@
       "title": "Telegram for Raycast",
       "description": "Use your Telegram through Raycast",
       "mode": "view"
+    },
+    {
+      "name": "openChat",
+      "title": "Open Telegram Chat",
+      "description": "Open specific chat in Telegram",
+      "mode": "view"
     }
   ],
   "dependencies": {
